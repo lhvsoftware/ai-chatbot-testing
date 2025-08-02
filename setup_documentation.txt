@@ -1,0 +1,594 @@
+# Setup Guide - HubSpot Chatbot Testing Framework
+
+This guide will help you set up the testing framework on your local machine and configure it for testing HubSpot's chatbot.
+
+## Prerequisites
+
+### Required Software
+
+1. **Node.js** (version 16 or higher)
+   ```bash
+   # Check your version
+   node --version
+   
+   # Install from https://nodejs.org/ if needed
+   ```
+
+2. **Git** for version control
+   ```bash
+   git --version
+   ```
+
+3. **K6** for load testing (optional but recommended)
+   ```bash
+   # On macOS
+   brew install k6
+   
+   # On Ubuntu/Debian
+   sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+   echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+   sudo apt-get update
+   sudo apt-get install k6
+   
+   # On Windows
+   choco install k6
+   ```
+
+### Optional Tools
+
+- **VS Code** with Playwright extension for better development experience
+- **Docker** for containerized testing (advanced setup)
+
+## Installation Steps
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/yourusername/hubspot-chatbot-testing.git
+cd hubspot-chatbot-testing
+```
+
+### 2. Install Dependencies
+
+```bash
+# Install Node.js dependencies
+npm install
+
+# Install Playwright browsers
+npx playwright install
+
+# Make scripts executable (Linux/macOS)
+chmod +x scripts/*.sh
+```
+
+### 3. Verify Installation
+
+```bash
+# Run the installation verification script
+npm run verify-setup
+
+# Or manually check each component
+npx playwright --version
+k6 version
+node --version
+```
+
+## Configuration
+
+### 1. Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+cp .env.example .env
+```
+
+Edit the `.env` file with your settings:
+
+```env
+# Chatbot API Configuration
+CHATBOT_API_URL=https://api.hubspot.com/conversations/v3/conversations/inbound
+HUBSPOT_BASE_URL=https://www.hubspot.com
+
+# Test Configuration
+TEST_TIMEOUT=30000
+PERFORMANCE_THRESHOLD=5000
+LOAD_TEST_DURATION=300
+
+# Reporting
+REPORT_WEBHOOK_URL=https://your-webhook-url.com/reports
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK
+
+# Browser Configuration
+HEADLESS=true
+SLOW_MO=0
+VIDEO_ON_FAILURE=true
+SCREENSHOT_ON_FAILURE=true
+
+# Debug Settings
+DEBUG=false
+VERBOSE_LOGGING=false
+```
+
+### 2. Test Data Configuration
+
+Edit `src/config/test-data.js` to customize test scenarios:
+
+```javascript
+// Example customization
+const TEST_SCENARIOS = [
+  {
+    category: 'pricing_inquiry',
+    messages: [
+      'What are your pricing plans?',
+      'How much does HubSpot cost?',
+      // Add your custom test messages
+    ],
+    weight: 25 // Percentage of tests using this scenario
+  },
+  // Add more scenarios as needed
+];
+```
+
+### 3. Selector Configuration
+
+If HubSpot changes their chatbot implementation, you may need to update selectors in `src/config/selectors.js`:
+
+```javascript
+// Update these selectors if the chatbot UI changes
+const HUBSPOT_SELECTORS = {
+  widget: {
+    container: '[data-test-id="chat-widget"]', // Update as needed
+    launcher: '[data-test-id="chat-launcher"]',
+    // ... other selectors
+  }
+};
+```
+
+## Basic Usage
+
+### Run Individual Tests
+
+```bash
+# Basic functionality tests
+npm run test:basic
+
+# Performance tests
+npm run test:performance
+
+# Mobile tests
+npm run test:mobile
+
+# All Playwright tests
+npm test
+```
+
+### Run Load Tests
+
+```bash
+# Basic load test
+npm run k6:load
+
+# Stress test
+npm run k6:stress
+
+# Spike test
+npm run k6:spike
+```
+
+### Run Complete Test Suite
+
+```bash
+# Run everything with report generation
+./scripts/run-all-tests.sh
+
+# Or use npm script
+npm run test:all
+```
+
+## Development Setup
+
+### 1. IDE Configuration
+
+If using VS Code, install these extensions:
+- Playwright Test for VS Code
+- ESLint
+- Prettier
+
+### 2. Git Hooks (Optional)
+
+Set up pre-commit hooks to run tests before commits:
+
+```bash
+# Install husky for git hooks
+npm install --save-dev husky
+
+# Set up pre-commit hook
+npx husky add .husky/pre-commit "npm run lint && npm run test:basic"
+
+# Make it executable
+chmod +x .husky/pre-commit
+```
+
+### 3. Debug Configuration
+
+For debugging tests in VS Code, add this to `.vscode/launch.json`:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Playwright Tests",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/.bin/playwright",
+      "args": ["test", "--debug"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    }
+  ]
+}
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. Playwright Browser Installation Failed
+
+```bash
+# Clear cache and reinstall
+rm -rf ~/.cache/ms-playwright
+npx playwright install --force
+```
+
+#### 2. Chatbot Widget Not Found
+
+The chatbot selectors may have changed. To debug:
+
+1. Open HubSpot in your browser
+2. Open Developer Tools (F12)
+3. Look for chatbot elements in the DOM
+4. Update selectors in `src/config/selectors.js`
+
+Example debugging process:
+```javascript
+// In browser console, try these commands to find chatbot elements:
+document.querySelector('[class*="chat"]')
+document.querySelector('[id*="chat"]')
+document.querySelector('iframe[title*="chat"]')
+```
+
+#### 3. K6 Load Tests Failing
+
+Check if the API endpoint is correct:
+```bash
+# Test the endpoint manually
+curl -X POST https://api.hubspot.com/conversations/v3/conversations/inbound \
+  -H "Content-Type: application/json" \
+  -d '{"message": "test"}'
+```
+
+#### 4. Tests Running Too Slowly
+
+Optimize performance:
+```bash
+# Run in headless mode
+HEADLESS=true npm test
+
+# Reduce browser instances
+npx playwright test --workers=1
+
+# Skip video recording
+VIDEO_ON_FAILURE=false npm test
+```
+
+#### 5. Network/Timeout Issues
+
+Increase timeouts in `playwright.config.js`:
+```javascript
+use: {
+  actionTimeout: 30000,      // Increase from 15000
+  navigationTimeout: 60000,  // Increase from 30000
+}
+```
+
+### Environment-Specific Issues
+
+#### Windows
+
+- Use Git Bash or WSL for shell scripts
+- Ensure execution policy allows script running:
+  ```powershell
+  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+  ```
+
+#### macOS
+
+- Install Xcode Command Line Tools if you get compilation errors:
+  ```bash
+  xcode-select --install
+  ```
+
+#### Linux
+
+- You may need additional dependencies for browsers:
+  ```bash
+  npx playwright install-deps
+  ```
+
+## Advanced Configuration
+
+### 1. Custom Test Environment
+
+Create environment-specific configurations:
+
+```bash
+# Create config for staging environment
+cp .env .env.staging
+
+# Run tests against staging
+NODE_ENV=staging npm test
+```
+
+### 2. CI/CD Integration
+
+The project includes GitHub Actions workflow. To use with other CI systems:
+
+#### Jenkins
+```groovy
+pipeline {
+  agent any
+  stages {
+    stage('Install') {
+      steps {
+        sh 'npm ci'
+        sh 'npx playwright install --with-deps'
+      }
+    }
+    stage('Test') {
+      steps {
+        sh './scripts/run-all-tests.sh'
+      }
+    }
+  }
+  post {
+    always {
+      publishHTML([
+        allowMissing: false,
+        alwaysLinkToLastBuild: true,
+        keepAll: true,
+        reportDir: 'reports/generated',
+        reportFiles: 'executive-summary-*.md',
+        reportName: 'Chatbot Test Report'
+      ])
+    }
+  }
+}
+```
+
+#### GitLab CI
+```yaml
+# .gitlab-ci.yml
+stages:
+  - test
+  - report
+
+test:
+  stage: test
+  image: node:18
+  before_script:
+    - npm ci
+    - npx playwright install --with-deps
+  script:
+    - ./scripts/run-all-tests.sh
+  artifacts:
+    when: always
+    paths:
+      - reports/generated/
+    expire_in: 1 week
+```
+
+### 3. Docker Setup
+
+Create a `Dockerfile` for containerized testing:
+
+```dockerfile
+FROM mcr.microsoft.com/playwright:v1.40.0-focal
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN chmod +x scripts/*.sh
+
+CMD ["./scripts/run-all-tests.sh"]
+```
+
+Build and run:
+```bash
+docker build -t hubspot-chatbot-testing .
+docker run --rm -v $(pwd)/reports:/app/reports hubspot-chatbot-testing
+```
+
+### 4. Monitoring Integration
+
+Set up monitoring dashboards:
+
+#### Grafana Dashboard
+```json
+{
+  "dashboard": {
+    "title": "HubSpot Chatbot Testing",
+    "panels": [
+      {
+        "title": "Test Success Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(chatbot_tests_passed[5m]) / rate(chatbot_tests_total[5m]) * 100"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### Datadog Integration
+```javascript
+// In your test files
+const { StatsD } = require('node-statsd');
+const statsd = new StatsD();
+
+// Send metrics
+statsd.increment('chatbot.test.passed');
+statsd.timing('chatbot.response_time', responseTime);
+```
+
+## Performance Optimization
+
+### 1. Parallel Test Execution
+
+Configure parallel execution in `playwright.config.js`:
+```javascript
+module.exports = defineConfig({
+  workers: process.env.CI ? 2 : 4, // Adjust based on your machine
+  fullyParallel: true,
+});
+```
+
+### 2. Test Sharding
+
+For large test suites, use sharding:
+```bash
+# Run tests across multiple machines
+npx playwright test --shard=1/3  # Machine 1
+npx playwright test --shard=2/3  # Machine 2
+npx playwright test --shard=3/3  # Machine 3
+```
+
+### 3. Browser Context Reuse
+
+Optimize browser usage:
+```javascript
+// In test files
+test.describe.configure({ mode: 'parallel' });
+```
+
+## Security Considerations
+
+### 1. Secrets Management
+
+Never commit sensitive data:
+```bash
+# Add to .gitignore
+echo "*.env" >> .gitignore
+echo "config/secrets.json" >> .gitignore
+```
+
+Use environment variables or secret management systems:
+```javascript
+const apiKey = process.env.HUBSPOT_API_KEY || 
+  require('./config/secrets.json').hubspotApiKey;
+```
+
+### 2. Network Security
+
+For internal testing environments:
+```bash
+# Use VPN or private networks
+export CHATBOT_API_URL=https://internal-hubspot-staging.company.com
+```
+
+### 3. Data Privacy
+
+Ensure test data doesn't contain real customer information:
+```javascript
+const testData = {
+  // Use fake data generators
+  email: faker.internet.email(),
+  name: faker.name.fullName(),
+  // Never use real customer data
+};
+```
+
+## Next Steps
+
+After completing setup:
+
+1. **Run your first test:**
+   ```bash
+   npm run test:basic
+   ```
+
+2. **Review the results:**
+   ```bash
+   open reports/generated/executive-summary-*.md
+   ```
+
+3. **Customize for your needs:**
+   - Update test scenarios in `src/config/test-data.js`
+   - Modify selectors if HubSpot UI changes
+   - Add new test categories as needed
+
+4. **Set up monitoring:**
+   - Configure CI/CD pipeline
+   - Set up alert notifications
+   - Schedule regular test runs
+
+5. **Expand testing:**
+   - Add more chatbot platforms
+   - Include voice chatbot testing
+   - Implement A/B testing scenarios
+
+## Getting Help
+
+- **Documentation:** Check `docs/` directory for detailed guides
+- **Issues:** Create GitHub issues for bugs or feature requests
+- **Discussions:** Use GitHub Discussions for questions
+- **Slack:** Join our Slack channel for real-time support
+
+## Useful Commands Reference
+
+```bash
+# Installation
+npm install && npx playwright install
+
+# Basic testing
+npm run test:basic
+npm run test:performance
+npm run test:mobile
+
+# Load testing
+npm run k6:load
+npm run k6:stress
+
+# Full test suite
+./scripts/run-all-tests.sh
+
+# Debug mode
+npx playwright test --debug
+npx playwright test --headed
+
+# Generate reports
+npm run report:generate
+
+# Linting
+npm run lint
+npm run lint:fix
+
+# Clean up
+npm run clean
+```
+
+---
+
+**Happy Testing!** 🚀
+
+For more detailed information, check out the other documentation files:
+- [Testing Methodology](testing-methodology.md)
+- [Issue Categorization](issue-categorization.md)
+- [HubSpot Analysis Guide](hubspot-analysis.md)
